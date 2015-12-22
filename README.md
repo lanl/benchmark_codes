@@ -13,6 +13,27 @@ version of the code includes: AES, LANL cache test, matrix multiply
 and quicksort.  We also use CoreMark for testing purposes, which can
 be found here: http://www.eembc.org/coremark/index.php.
 
+Output
+
+All of the tests output YAML parsable text on the part's UART.  It is
+possible to analyze this output with pyYAML.  LANL has codes, but they
+are not covered under this license.  We plan to release them in the
+future.  
+
+The outputs are also designed to be "robust" and "non-robust" for
+different types of testing.  Robust printing prints all of the
+information about an error, including the test number and all of the
+(correct, incorrect) value pairs.  Non-robust printing only prints the
+test number and the number of errors.  For a test like quicksort, the
+amount of output that can be generate could be timeconsuming, so
+non-robust printing is needed when there are many errors.  It is
+important that the printing not take over the computation process, so
+that the real computation is the test and not printf.  For radiation
+tests where the flux is very low, such as at LANSCE, it is possible to
+use the robust printing.  For radiation tests were the flux is very
+high, such as heavy ion testing, it is better to use non-robust
+printing.
+
 Installation
 
 This code is very bare boned.  It works with Code Composer Studio, but

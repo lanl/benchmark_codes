@@ -58,7 +58,11 @@ ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.*/
 // repeatable pattern.  The test is designed to test whether sorting many numbers
 // cause more errors than sorting an already sorted array.  To that end, the
 // test sorts an array two times in a row in the forward direction, followed by two
-// times in the reverse direction.
+// times in the reverse direction.  The qsort code that we used can be found here:
+//
+// http://rosettacode.org/wiki/Sorting_algorithms/Quicksort#C
+//
+// The user will need to create the reverse sort on their own.
 //
 // This software is otimized for microcontrollers.  In particular, it was designed
 // for the Texas Instruments MSP430F2619.
@@ -76,7 +80,7 @@ ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.*/
 
 #define		array_elements				580
 #define		robust_printing				1
-#define		change_rate					100
+#define		change_rate				100
 
 unsigned long int ind = 0;
 int local_errors = 0;
@@ -92,26 +96,28 @@ void initUART(void);
 void initMSP430();
 
 void init_array() {
-	int i = 0;
+  int i = 0;
 
-	//seed the random number generator
-	if (seed_value == -1) {
-		srand(ind);
-		seed_value = ind;
-	}
-	else {
-		srand(seed_value);
-	}
-
-
-	//fill the matrices
-	for ( i = 0; i < array_elements; i++ ){
-		int val = rand();
-		//int val = i;
-		array[i] = val;
-		golden_array[i] = val;
-		golden_array_rev[i] = val;
-	}
+  //seed the random number generator
+  //the input arrays are reset on error to the same values, so
+  //the seed value is not always new.  The seed value also
+  //changes with the change rate so that new values are used
+  //every few seconds during the test.
+  if (seed_value == -1) {
+    srand(ind);
+    seed_value = ind;
+  }
+  else {
+    srand(seed_value);
+  }
+  
+  //fill the matrices
+  for ( i = 0; i < array_elements; i++ ){
+    int val = rand();
+    array[i] = val;
+    golden_array[i] = val;
+    golden_array_rev[i] = val;
+  }
 }
 
 
@@ -122,160 +128,171 @@ void init_array() {
 //*****************************************************************************
 
 void quick_sort (int *a, int n) {
-	
+  //TODO: user enters code
 }
 
 void quick_sort_rev (int *a, int n) {
-	
+  //TODO: user enters code
 }
 
 int checker(int golden_array[], int dut_array[], int sub_test) {
-	int first_error = 0;
-	int num_of_errors = 0;
-	int i = 0;
+  int first_error = 0;
+  int num_of_errors = 0;
+  int i = 0;
 
-	for(i=0; i<array_elements; i++) {
-		if (golden_array[i] != dut_array[i]) {
-			if (!first_error) {
-				if (!in_block && robust_printing) {
-					printf(" - i: %n, %i\r\n", ind, sub_test);
-					printf("   E: {%i: [%x, %x],", i, golden_array[i], dut_array[i]);
-					first_error = 1;
-					in_block = 1;
-				}
-				else if (in_block && robust_printing){
-					printf("   E: {%i: [%x, %x],", i, golden_array[i], dut_array[i]);
-					first_error = 1;
-				}
-			}
-			else {
-				if (robust_printing)
-					printf("%i: [%x, %x],", i, golden_array[i], dut_array[i]);
-
-			}
-			num_of_errors++;
-		}
+  for(i=0; i<array_elements; i++) {
+    if (golden_array[i] != dut_array[i]) {
+      //an error is found, print the results
+      if (!first_error) {
+	if (!in_block && robust_printing) {
+	  printf(" - i: %n, %i\r\n", ind, sub_test);
+	  printf("   E: {%i: [%x, %x],", i, golden_array[i], dut_array[i]);
+	  first_error = 1;
+	  in_block = 1;
 	}
-
-	if (first_error) {
-		printf("}\r\n");
-		first_error = 0;
+	else if (in_block && robust_printing){
+	  printf("   E: {%i: [%x, %x],", i, golden_array[i], dut_array[i]);
+	  first_error = 1;
 	}
-
-	if (!robust_printing && (num_of_errors > 0)) {
-		if (!in_block) {
-			printf(" - i: %n, %i\r\n", ind, sub_test);
-			printf("   E: %i\r\n", num_of_errors);
-			in_block = 1;
-		}
-		else {
-			printf("   E: %i\r\n", num_of_errors);
-		}
-	}
-
-	return num_of_errors;
+      }
+      else {
+	if (robust_printing)
+	  printf("%i: [%x, %x],", i, golden_array[i], dut_array[i]);
+	
+      }
+      num_of_errors++;
+    }
+  }
+  
+  //more printing
+  if (first_error) {
+    printf("}\r\n");
+    first_error = 0;
+  }
+  
+  //non-robust printing
+  if (!robust_printing && (num_of_errors > 0)) {
+    if (!in_block) {
+      printf(" - i: %n, %i\r\n", ind, sub_test);
+      printf("   E: %i\r\n", num_of_errors);
+      in_block = 1;
+    }
+    else {
+      printf("   E: %i\r\n", num_of_errors);
+    }
+  }
+  
+  return num_of_errors;
 }
 
 void qsort_test() {
+  //initialize variables
+  int total_errors = 0;
+  int n = sizeof array / sizeof array[0];
+  int i = 0;
+  
+  //init arrays
+  init_array();
 
-	//initialize variables
-	int total_errors = 0;
-	int n = sizeof array / sizeof array[0];
-	int i = 0;
-
-	init_array();
+  //compute the goldens for the forward and reverse sorts.
+  quick_sort(golden_array, n);
+  quick_sort_rev(golden_array_rev, n);
+  
+  while (1) {
+    for (i = 0; i < 4; i++) {
+      //the first two sorts are forward
+      if (i < 2) {
+	quick_sort(array, n);
+	local_errors = checker(golden_array, array, i);
+      }
+      else {
+	//the last two sorts are reverse
+	quick_sort_rev(array, n);
+	local_errors = checker(golden_array_rev, array, i);
+      }
+      
+      //if there is an erro, fix the input arrays
+      //and recompute the two goldens.
+      if (local_errors > 0) {
+	init_array(seed_value);
 	quick_sort(golden_array, n);
 	quick_sort_rev(golden_array_rev, n);
+      }
+      
+      total_errors += local_errors;
+      local_errors = 0;
+      in_block = 0;
+      
+    }
+    
+    //ack and change input arrays
+    if (ind % change_rate == 0) {
+      printf("# %n, %i\r\n", ind, total_errors);
+      seed_value = -1;
+      
+      //init arrays with new values
+      init_array();
 
-	while (1) {
-		for (i = 0; i < 4; i++) {
-			if (i < 2) {
-				quick_sort(array, n);
-				local_errors = checker(golden_array, array, i);
-			}
-			else {
-				quick_sort_rev(array, n);
-				local_errors = checker(golden_array_rev, array, i);
-			}
-
-			if (local_errors > 0) {
-				init_array(seed_value);
-				quick_sort(golden_array, n);
-				quick_sort_rev(golden_array_rev, n);
-			}
-
-			total_errors += local_errors;
-			local_errors = 0;
-			in_block = 0;
-
-		}
-
-		if (ind % change_rate == 0) {
-			if (ind != 0) {
-				initUART();
-			}
-
-			printf("# %n, %i\r\n", ind, total_errors);
-			seed_value = -1;
-			init_array();
-			quick_sort(golden_array, n);
-			quick_sort_rev(golden_array_rev, n);
-		}
-
-		//reset vars and such
-		ind++;
-	}
-
+      //compute the two new golden arrays
+      quick_sort(golden_array, n);
+      quick_sort_rev(golden_array_rev, n);
+    }
+    
+    //reset vars and such
+    ind++;
+  }
+  
 }
 
 int main()
 {
-	initMSP430();
+  //init the part
+  initMSP430();
 
-	printf("\r\n---\r\n");
-	printf("hw: msp430f2619\r\n");
-	printf("test: QSort\r\n");
-	printf("mit: none\r\n");
-	printf("printing: %i\r\n", robust_printing);
-	printf("input change rate: %i\r\n", change_rate);
-	printf("Array size: %i\r\n", array_elements);
-	printf("ver: 0.1\r\n");
-	printf("fac: LANSCE Nov 2015\r\n");
-	printf("d:\r\n");
+  //print the YAML header
+  printf("\r\n---\r\n");
+  printf("hw: msp430f2619\r\n");
+  printf("test: QSort\r\n");
+  printf("mit: none\r\n");
+  printf("printing: %i\r\n", robust_printing);
+  printf("input change rate: %i\r\n", change_rate);
+  printf("Array size: %i\r\n", array_elements);
+  printf("ver: 0.1\r\n");
+  printf("fac: LANSCE Nov 2015\r\n");
+  printf("d:\r\n");
 
-	qsort_test();
+  //start the test
+  qsort_test();
 
-	return 0;
+  return 0;
 
 }
 
 
 void initMSP430() {
-	//MSP430F2619 initialization code
-	WDTCTL = WDTPW + WDTHOLD;                 // Stop WDT
-	if (CALBC1_1MHZ==0xFF)					// If calibration constant erased
-	{
-		while(1);                               // do not load, trap CPU!!
-	}
-	DCOCTL = 0;                               // Select lowest DCOx and MODx settings
-	BCSCTL1 = CALBC1_1MHZ;                    // Set DCO
-	DCOCTL = CALDCO_1MHZ;
-
-	initUART();
+  //MSP430F2619 initialization code
+  WDTCTL = WDTPW + WDTHOLD;                 // Stop WDT
+  if (CALBC1_1MHZ==0xFF)		    // If calibration constant erased
+    {
+		while(1);                   // do not load, trap CPU!!
+    }
+  DCOCTL = 0;                               // Select lowest DCOx and MODx settings
+  BCSCTL1 = CALBC1_1MHZ;                    // Set DCO
+  DCOCTL = CALDCO_1MHZ;
+  
+  initUART();
 }
 
 /**
  * Initializes the UART for 9600 baud with a RX interrupt
  **/
 void initUART(void) {
-
-	P3SEL = 0x30;                             // P3.4,5 = USCI_A0 TXD/RXD
-	UCA0CTL1 |= UCSSEL_2;                     // SMCLK
-	UCA0BR0 = 104;                            // 1MHz 9600; (104)decimal = 0x068h
-	UCA0BR1 = 0;                              // 1MHz 9600
-	UCA0MCTL = UCBRS0;                        // Modulation UCBRSx = 1
-	UCA0CTL1 &= ~UCSWRST;                     // **Initialize USCI state machine**
-	//IE2 |= UCA0RXIE; 						  // Enable USCI_A0 RX interrupt
+  P3SEL = 0x30;                             // P3.4,5 = USCI_A0 TXD/RXD
+  UCA0CTL1 |= UCSSEL_2;                     // SMCLK
+  UCA0BR0 = 104;                            // 1MHz 9600; (104)decimal = 0x068h
+  UCA0BR1 = 0;                              // 1MHz 9600
+  UCA0MCTL = UCBRS0;                        // Modulation UCBRSx = 1
+  UCA0CTL1 &= ~UCSWRST;                     // **Initialize USCI state machine**
 }
 
 
@@ -286,12 +303,12 @@ void initUART(void) {
  * LCD display.
  **/
 void puts(char *s) {
-	char c;
-
-	// Loops through each character in string 's'
-	while (c = *s++) {
-		sendByte(c);
-	}
+  char c;
+  
+  // Loops through each character in string 's'
+  while (c = *s++) {
+    sendByte(c);
+  }
 }
 /**
  * puts() is used by printf() to display or send a character. This function
@@ -299,7 +316,7 @@ void puts(char *s) {
  * out over UART.
  **/
 void putc(char b) {
-	sendByte(b);
+  sendByte(b);
 }
 
 /**
@@ -307,8 +324,8 @@ void putc(char b) {
  **/
 void sendByte(char byte )
 {
-	while (!(IFG2&UCA0TXIFG)); // USCI_A0 TX buffer ready?
-	UCA0TXBUF = byte; // TX -> RXed character
+  while (!(IFG2&UCA0TXIFG)); // USCI_A0 TX buffer ready?
+  UCA0TXBUF = byte; // TX -> RXed character
 }
 
 
@@ -316,8 +333,8 @@ void sendByte(char byte )
 #pragma vector=USCIAB0RX_VECTOR
 __interrupt void USCI0RX_ISR(void)
 {
-
-	while (!(IFG2&UCA0TXIFG));                // USCI_A0 TX buffer ready?
-	UCA0TXBUF = UCA0RXBUF;                    // TX -> RXed character
+  
+  while (!(IFG2&UCA0TXIFG));                // USCI_A0 TX buffer ready?
+  UCA0TXBUF = UCA0RXBUF;                    // TX -> RXed character
 }
 
