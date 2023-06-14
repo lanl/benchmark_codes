@@ -13,6 +13,19 @@ version of the code includes: AES, LANL cache test, matrix multiply
 and quicksort.  We also use CoreMark for testing purposes, which can
 be found here: http://www.eembc.org/coremark/index.php.
 
+The ver 1.0 update of benchmarks has made several changes to the cache
+test, the quicksort codes.  The cache test improvements help
+distinguish the difference between address decoder erros and SEUs.
+The quicksort changes allow us to release the code with the software,
+unlike the 0.1 version.  Several inputs have been changed for the
+cache, quicksort, and matrix multiply tests.  These improvements help
+determine the effect of the inputs on the errors.
+
+Input
+
+The inputs have been changed on several of the codes in the 1.0 update
+that puvished on 6/14/2023.
+
 Output
 
 All of the tests output YAML parsable text on the part's UART.  It is
