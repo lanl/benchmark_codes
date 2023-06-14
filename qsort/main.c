@@ -1,50 +1,4 @@
 /*
-Copyright (c) 2015, Los Alamos National Security, LLC
-All rights reserved.
-
-Copyright 2015. Los Alamos National Security, LLC. This software was
-produced under U.S. Government contract DE-AC52-06NA25396 for Los
-Alamos National Laboratory (LANL), which is operated by Los Alamos
-National Security, LLC for the U.S. Department of Energy. The
-U.S. Government has rights to use, reproduce, and distribute this
-software.  NEITHER THE GOVERNMENT NOR LOS ALAMOS NATIONAL SECURITY,
-LLC MAKES ANY WARRANTY, EXPRESS OR IMPLIED, OR ASSUMES ANY LIABILITY
-FOR THE USE OF THIS SOFTWARE.  If software is modified to produce
-derivative works, such modified software should be clearly marked, so
-as not to confuse it with the version available from LANL.
-
-Additionally, redistribution and use in source and binary forms, with
-or without modification, are permitted provided that the following
-conditions are met:
-
-• Redistributions of source code must retain the above copyright
-         notice, this list of conditions and the following disclaimer.
-
-• Redistributions in binary form must reproduce the above copyright
-         notice, this list of conditions and the following disclaimer
-         in the documentation and/or other materials provided with the
-         distribution.
-
-• Neither the name of Los Alamos National Security, LLC, Los Alamos
-         National Laboratory, LANL, the U.S. Government, nor the names
-         of its contributors may be used to endorse or promote
-         products derived from this software without specific prior
-         written permission.
-
-THIS SOFTWARE IS PROVIDED BY LOS ALAMOS NATIONAL SECURITY, LLC AND
-CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING,
-BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND
-FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL LOS
-ALAMOS NATIONAL SECURITY, LLC OR CONTRIBUTORS BE LIABLE FOR ANY
-DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
-DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE
-GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
-INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER
-IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR
-OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
-ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.*/
-
-/*
  *****************************************************************************
 //
 // AUTHOR:  Heather Quinn
@@ -53,16 +7,18 @@ ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.*/
 //
 // tiva_qsort.c
 //
-// This test is a simple program for testing quicksort.  The data are randomly
-// generated and placed in an array.  The inputs change every few seconds in a 
-// repeatable pattern.  The test is designed to test whether sorting many numbers
-// cause more errors than sorting an already sorted array.  To that end, the
-// test sorts an array two times in a row in the forward direction, followed by two
-// times in the reverse direction.  The qsort code that we used can be found here:
-//
-// http://rosettacode.org/wiki/Sorting_algorithms/Quicksort#C
-//
-// The user will need to create the reverse sort on their own.
+// This test is a simple program for testing quicksort.  The input data are
+// the same pattern as the cache_static tests: mostly 0s, mostly 1s, mostly
+// As, and msotly 5s.  As with the other test, the values have their addresses
+// encoded to see if the issue could be address decoding.  As with the cache_static
+// test, larger test arrays need to have the pattern changed.  The test is
+// designed to test whether sorting many numbers cause more errors than sorting
+// an already sorted array, so the algorithm switches between sorting forward twice
+// and then sorting backward twice.  This version of the code includes qsort algorithms,
+// unlike the previous version.  The forward and reverse sorts were created by
+// another engineer using a clean-room technique to recreate the quicksort algorithms.
+// without violating the licensing of any of the existing quicksort algorithms.  The
+// new algorithm is functionally the same.
 //
 // This software is otimized for microcontrollers.  In particular, it was designed
 // for the Texas Instruments MSP430F2619.
@@ -76,225 +32,228 @@ ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.*/
 
 #include <msp430.h>
 #include <string.h>
-#include <stdlib.h>
+#include "stdio.h"
 
-#define		array_elements				580
-#define		robust_printing				1
-#define		change_rate				100
+#include "pattern.h"
 
-unsigned long int ind = 0;
-int local_errors = 0;
-int in_block = 0;
-int seed_value = -1;
-int array[array_elements];
-int golden_array[array_elements];
-int golden_array_rev[array_elements];
-
+void printHeader(void);
 void sendByte(char);
-void printf(char *, ...);
 void initUART(void);
 void initMSP430();
 
-void init_array() {
-  int i = 0;
+#define     robust_printing           1
+#define     array_elements            180
+#define     change_rate               50
 
-  //seed the random number generator
-  //the input arrays are reset on error to the same values, so
-  //the seed value is not always new.  The seed value also
-  //changes with the change rate so that new values are used
-  //every few seconds during the test.
-  if (seed_value == -1) {
-    srand(ind);
-    seed_value = ind;
-  }
-  else {
-    srand(seed_value);
-  }
-  
-  //fill the matrices
-  for ( i = 0; i < array_elements; i++ ){
-    int val = rand();
-    array[i] = val;
-    golden_array[i] = val;
-    golden_array_rev[i] = val;
-  }
+int seed_value = -1;
+int array[array_elements];
+
+unsigned long int ind = 0;
+int local_errors = 0;
+int sum_errors = 0;
+int in_block = 0;
+
+void init_array()
+{
+    int i = 0;
+
+    for (i = 0; i < array_elements; i++)
+    {
+        array[i] = static_pattern[i];
+    }
 }
 
-
-//*****************************************************************************
-//
-// Quick sort code from http://rosettacode.org/wiki/Sorting_algorithms/Quicksort#C
-//
-//*****************************************************************************
-
 void quick_sort (int *a, int n) {
-  //TODO: user enters code
+    if (n < 2)
+        return;
+    int p = a[n / 2];
+    int *l = a;
+    int *r = a + n - 1;
+    while (l <= r) {
+        if (*l < p) {
+            l++;
+        }
+        else if (*r > p) {
+            r--;
+        }
+        else {
+            int t = *l;
+            *l = *r;
+            *r = t;
+            l++;
+            r--;
+        }
+    }
+    quick_sort(a, r - a + 1);
+    quick_sort(l, a + n - l);
 }
 
 void quick_sort_rev (int *a, int n) {
-  //TODO: user enters code
+    if (n < 2)
+        return;
+    int p = a[n / 2];
+    int *l = a;
+    int *r = a + n - 1;
+    while (l <= r) {
+        if (*l > p) {
+            l++;
+        }
+        else if (*r < p) {
+            r--;
+        }
+        else {
+            int t = *l;
+            *l = *r;
+            *r = t;
+            l++;
+            r--;
+        }
+    }
+    quick_sort_rev(a, r - a + 1);
+    quick_sort_rev(l, a + n - l);
 }
 
 int checker(int golden_array[], int dut_array[], int sub_test) {
-  int first_error = 0;
-  int num_of_errors = 0;
-  int i = 0;
+    int first_error = 0;
+    int num_of_errors = 0;
+    int i = 0;
 
-  for(i=0; i<array_elements; i++) {
-    if (golden_array[i] != dut_array[i]) {
-      //an error is found, print the results
-      if (!first_error) {
-	if (!in_block && robust_printing) {
-	  printf(" - i: %n, %i\r\n", ind, sub_test);
-	  printf("   E: {%i: [%x, %x],", i, golden_array[i], dut_array[i]);
-	  first_error = 1;
-	  in_block = 1;
-	}
-	else if (in_block && robust_printing){
-	  printf("   E: {%i: [%x, %x],", i, golden_array[i], dut_array[i]);
-	  first_error = 1;
-	}
-      }
-      else {
-	if (robust_printing)
-	  printf("%i: [%x, %x],", i, golden_array[i], dut_array[i]);
-	
-      }
-      num_of_errors++;
+    for(i=0; i<array_elements; i++) {
+        if (golden_array[i] != dut_array[i]) {
+            if (!first_error) {
+                if (!in_block && robust_printing) {
+                    printf(" - i: %u, %i\r\n", ind, sub_test);
+                    printf("   E: {%i: [%x, %x],", i, golden_array[i], dut_array[i]);
+                    first_error = 1;
+                    in_block = 1;
+                }
+                else if (in_block && robust_printing){
+                    printf("   E: {%i: [%x, %x],", i, golden_array[i], dut_array[i]);
+                    first_error = 1;
+                }
+            }
+            else {
+                if (robust_printing)
+                    printf("%i: [%x, %x],", i, golden_array[i], dut_array[i]);
+
+            }
+            num_of_errors++;
+        }
     }
-  }
-  
-  //more printing
-  if (first_error) {
-    printf("}\r\n");
-    first_error = 0;
-  }
-  
-  //non-robust printing
-  if (!robust_printing && (num_of_errors > 0)) {
-    if (!in_block) {
-      printf(" - i: %n, %i\r\n", ind, sub_test);
-      printf("   E: %i\r\n", num_of_errors);
-      in_block = 1;
+
+    if (first_error) {
+        printf("}\r\n");
+        first_error = 0;
     }
-    else {
-      printf("   E: %i\r\n", num_of_errors);
+
+    if (!robust_printing && (num_of_errors > 0)) {
+        if (!in_block) {
+            printf(" - i: %u, %i\r\n", ind, sub_test);
+            printf("   E: %i\r\n", num_of_errors);
+            in_block = 1;
+        }
+        else {
+            printf("   E: %i\r\n", num_of_errors);
+        }
     }
-  }
-  
-  return num_of_errors;
+
+    return num_of_errors;
 }
 
 void qsort_test() {
-  //initialize variables
-  int total_errors = 0;
-  int n = sizeof array / sizeof array[0];
-  int i = 0;
-  
-  //init arrays
-  init_array();
 
-  //compute the goldens for the forward and reverse sorts.
-  quick_sort(golden_array, n);
-  quick_sort_rev(golden_array_rev, n);
-  
-  while (1) {
-    for (i = 0; i < 4; i++) {
-      //the first two sorts are forward
-      if (i < 2) {
-	quick_sort(array, n);
-	local_errors = checker(golden_array, array, i);
-      }
-      else {
-	//the last two sorts are reverse
-	quick_sort_rev(array, n);
-	local_errors = checker(golden_array_rev, array, i);
-      }
-      
-      //if there is an erro, fix the input arrays
-      //and recompute the two goldens.
-      if (local_errors > 0) {
-	init_array(seed_value);
-	quick_sort(golden_array, n);
-	quick_sort_rev(golden_array_rev, n);
-      }
-      
-      total_errors += local_errors;
-      local_errors = 0;
-      in_block = 0;
-      
-    }
-    
-    //ack and change input arrays
-    if (ind % change_rate == 0) {
-      printf("# %n, %i\r\n", ind, total_errors);
-      seed_value = -1;
-      
-      //init arrays with new values
-      init_array();
+    //initialize variables
+    int total_errors = 0;
+    int n = sizeof array / sizeof array[0];
+    int i = 0;
 
-      //compute the two new golden arrays
-      quick_sort(golden_array, n);
-      quick_sort_rev(golden_array_rev, n);
+    init_array();
+
+    while (1) {
+        for (i = 0; i < 4; i++) {
+            if (i < 2) {
+                quick_sort(array, n);
+                local_errors = checker(static_pattern_forward, array, i);
+            }
+            else {
+                quick_sort_rev(array, n);
+                local_errors = checker(static_pattern_reverse, array, i);
+            }
+
+            if (local_errors > 0) {
+                init_array();
+            }
+
+            total_errors += local_errors;
+            local_errors = 0;
+            in_block = 0;
+
+        }
+
+        if (ind % change_rate == 0) {
+            if (ind != 0) {
+                initUART();
+            }
+
+            printf("# %u, %i\r\n", ind, total_errors);
+        }
+
+        //reset vars and such
+        ind++;
+
     }
-    
-    //reset vars and such
-    ind++;
-  }
-  
+
 }
 
-int main()
+int main(void)
 {
-  //init the part
-  initMSP430();
 
-  //print the YAML header
-  printf("\r\n---\r\n");
-  printf("hw: msp430f2619\r\n");
-  printf("test: QSort\r\n");
-  printf("mit: none\r\n");
-  printf("printing: %i\r\n", robust_printing);
-  printf("input change rate: %i\r\n", change_rate);
-  printf("Array size: %i\r\n", array_elements);
-  printf("ver: 0.1\r\n");
-  printf("fac: LANSCE Nov 2015\r\n");
-  printf("d:\r\n");
+    initMSP430();
 
-  //start the test
-  qsort_test();
+    printf("\n\r---\n\r");
+    printf("hw: MSP430F2619\r\n");
+    printf("test: qsort_flash\r\n");
+    printf("mit: none\r\n");
+    printf("printing: %i\r\n", robust_printing);
+    printf("Array size: %i\r\n", array_elements);
+    printf("ver: 1.0\r\n");
+    printf("fac: LANSCE Oct 2019\r\n");
+    printf("d:\r\n");
 
-  return 0;
-
+    qsort_test();
 }
 
+void initMSP430()
+{
+    //MSP430F2619 initialization code
+    WDTCTL = WDTPW + WDTHOLD;
 
-void initMSP430() {
-  //MSP430F2619 initialization code
-  WDTCTL = WDTPW + WDTHOLD;                 // Stop WDT
-  if (CALBC1_1MHZ==0xFF)		    // If calibration constant erased
+    if (CALBC1_1MHZ == 0xFF)				// If calibration constant erased
     {
-		while(1);                   // do not load, trap CPU!!
+        while (1)
+            ;                               // do not load, trap CPU!!
     }
-  DCOCTL = 0;                               // Select lowest DCOx and MODx settings
-  BCSCTL1 = CALBC1_1MHZ;                    // Set DCO
-  DCOCTL = CALDCO_1MHZ;
-  
-  initUART();
+    DCOCTL = 0;                          // Select lowest DCOx and MODx settings
+    BCSCTL1 = CALBC1_1MHZ;                    // Set DCO
+    DCOCTL = CALDCO_1MHZ;
+
+    initUART();
 }
 
 /**
  * Initializes the UART for 9600 baud with a RX interrupt
  **/
-void initUART(void) {
-  P3SEL = 0x30;                             // P3.4,5 = USCI_A0 TXD/RXD
-  UCA0CTL1 |= UCSSEL_2;                     // SMCLK
-  UCA0BR0 = 104;                            // 1MHz 9600; (104)decimal = 0x068h
-  UCA0BR1 = 0;                              // 1MHz 9600
-  UCA0MCTL = UCBRS0;                        // Modulation UCBRSx = 1
-  UCA0CTL1 &= ~UCSWRST;                     // **Initialize USCI state machine**
-}
+void initUART(void)
+{
 
+    P3SEL = 0x30;                             // P3.4,5 = USCI_A0 TXD/RXD
+    UCA0CTL1 |= UCSSEL_2;                     // SMCLK
+    UCA0BR0 = 104;                           // 1MHz 9600; (104)decimal = 0x068h
+    UCA0BR1 = 0;                              // 1MHz 9600
+    UCA0MCTL = UCBRS0;                        // Modulation UCBRSx = 1
+    UCA0CTL1 &= ~UCSWRST;                   // **Initialize USCI state machine**
+    //IE2 |= UCA0RXIE; 						  // Enable USCI_A0 RX interrupt
+}
 
 /**
  * puts() is used by printf() to display or send a string.. This function
@@ -302,39 +261,48 @@ void initUART(void) {
  * out over UART, another option could be to display the string on an
  * LCD display.
  **/
-void puts(char *s) {
-  char c;
-  
-  // Loops through each character in string 's'
-  while (c = *s++) {
-    sendByte(c);
-  }
+int puts(const char *_ptr)
+{
+    unsigned int i, len;
+
+    len = strlen(_ptr);
+
+    for (i = 0; i < len; i++)
+    {
+        sendByte(_ptr[i]);
+    }
+
+    return len;
 }
 /**
  * puts() is used by printf() to display or send a character. This function
  * determines where printf prints to. For this case it sends a character
  * out over UART.
  **/
-void putc(char b) {
-  sendByte(b);
+int putc(int _x, FILE *_fp)
+{
+    sendByte(_x);
+
+    return _x;
 }
 
 /**
  * Sends a single byte out through UART
  **/
-void sendByte(char byte )
+void sendByte(char byte)
 {
-  while (!(IFG2&UCA0TXIFG)); // USCI_A0 TX buffer ready?
-  UCA0TXBUF = byte; // TX -> RXed character
+    while (!(IFG2 & UCA0TXIFG))
+        ; // USCI_A0 TX buffer ready?
+    UCA0TXBUF = byte; // TX -> RXed character
 }
-
 
 //  Echo back RXed character, confirm TX buffer is ready first
 #pragma vector=USCIAB0RX_VECTOR
 __interrupt void USCI0RX_ISR(void)
 {
-  
-  while (!(IFG2&UCA0TXIFG));                // USCI_A0 TX buffer ready?
-  UCA0TXBUF = UCA0RXBUF;                    // TX -> RXed character
+
+    while (!(IFG2 & UCA0TXIFG))
+        ;                // USCI_A0 TX buffer ready?
+    UCA0TXBUF = UCA0RXBUF;                    // TX -> RXed character
 }
 

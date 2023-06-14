@@ -245,7 +245,7 @@ int main( void )
   printf("test: aes\r\n");
   printf("mit: none\r\n");
   printf("printing: %i\r\n", robust_printing);
-  printf("ver: 0.1\r\n");
+  printf("ver: 1.0\r\n");
   printf("fac: LANSCE Nov 2015\r\n");
   printf("d:\r\n");
   
